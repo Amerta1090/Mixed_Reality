@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ GLITCH HAT LAB ⚡</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Major+Mono+Display&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'cyber-dark': '#0A0A1F', // Almost black, deep blue
+              'cyber-medium': '#1A1A3A', // Darker blue
+              'cyber-light': '#3A3A6B', // Lighter blue for depth
+              'neon-pink': '#FF00A2', // Vibrant pink for accents
+              'neon-green': '#00FFC2', // Vibrant green for highlights/interactivity
+              'glitch-red': '#FF003C', // Red for errors/strong accents
+              'glitch-blue': '#003CFF', // Blue for errors/strong accents
+            },
+            fontFamily: {
+              display: ['"Major Mono Display"', 'monospace'], // Monospace, futuristic
+              pixel: ['"Press Start 2P"', 'cursive'], // Pixelated, retro-futuristic
+            },
+            keyframes: {
+              flicker: {
+                '0%, 19%, 21%, 23%, 25%, 54%, 56%, 100%': { opacity: 1, filter: 'brightness(1)' },
+                '20%, 24%, 55%': { opacity: 0.8, filter: 'brightness(1.1) saturate(1.2)' },
+              },
+              glitch: {
+                '0%': { transform: 'translate(0)' },
+                '20%': { transform: 'translate(-2px, 2px)' },
+                '40%': { transform: 'translate(-2px, -2px)' },
+                '60%': { transform: 'translate(2px, 2px)' },
+                '80%': { transform: 'translate(2px, -2px)' },
+                '100%': { transform: 'translate(0)' },
+              },
+            },
+            animation: {
+              flicker: 'flicker 3s infinite alternate',
+              glitch: 'glitch 0.2s infinite alternate',
+            },
+          }
+        }
+      }
+    </script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: theme('colors.cyber-dark'); /* Menggunakan warna dari tema */
+            font-family: theme('fontFamily.body'); /* Default font */
+            color: theme('colors.textlight'); /* Default text color */
+        }
+
+        /* Memastikan video dan overlay mengisi penuh kontainer tanpa terpotong */
+        #video, #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Penting agar video tidak terpotong */
+            transform: none !important; /* Menghapus transform scale dari JS/sebelumnya */
+            transform-origin: center center;
+            /* Filter untuk efek ekstrem */
+            filter: saturate(1.5) contrast(1.2); /* Meningkatkan saturasi dan kontras */
+        }
+
+        #video { z-index: 1; }
+        #overlay { z-index: 2; pointer-events: none; }
+
+        /* Kelas glitch untuk elemen tertentu */
+        .glitch-text {
+            animation: glitch 0.2s infinite alternate;
+        }
+
+        .flicker-effect {
+            animation: flicker 3s infinite alternate;
+        }
+    </style>
+</head>
+<body class="bg-cyber-dark text-textlight font-body">
+    <div class="relative w-[640px] h-[480px] bg-cyber-medium rounded-2xl shadow-2xl overflow-hidden
+                border-2 border-neon-pink ring-4 ring-neon-green ring-offset-2 ring-offset-cyber-dark animate-pulse-slow">
+        <video id="video" autoplay muted playsinline></video>
+        <canvas id="overlay"></canvas>
+
+        <div class="absolute inset-0 flex flex-col justify-between p-8 z-30 pointer-events-none">
+            <div class="text-center mb-6">
+                <h1 class="font-pixel text-3xl md:text-4xl lg:text-5xl text-neon-pink drop-shadow-[0_0_8px_rgba(255,0,162,0.8)]
+                           flicker-effect pointer-events-auto select-none tracking-wider">
+                    ⚡ GLITCH HAT LAB ⚡
+                </h1>
+                <p class="font-display text-sm text-neon-green mt-2 animate-pulse-slow">
+                    Augmented Reality Experience
+                </p>
+            </div>
+
+            <div class="flex justify-center space-x-6 pointer-events-auto">
+                </div>
+
+            <div class="absolute bottom-4 left-4 text-xs font-display text-neon-green/70">
+                STATUS: ONLINE_0.1
+            </div>
+            <div class="absolute bottom-4 right-4 text-xs font-display text-glitch-red/70">
+                WARNING: BETA_MODE
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script defer src="app.js"></script>
+</body>
+</html>
