@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mixed Reality Pinch & Drag</title>
+    <style>
+        /* Body styling */
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: radial-gradient(circle, rgba(18, 18, 18, 1) 0%, rgba(31, 31, 31, 1) 100%);
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            position: relative;
+            cursor: none; /* Hide the default cursor */
+        }
+
+        /* Custom Cursor */
+        .cursor {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: rgba(0, 255, 255, 0.7);
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            transition: transform 0.1s ease;
+        }
+
+        /* Video and Canvas Centering */
+        video,
+        canvas {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            object-fit: cover;
+            border-radius: 20px;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+        }
+
+        /* Canvas styling */
+        canvas {
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Instructions Section */
+        .overlay-controls {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            z-index: 10;
+            color: #fff;
+        }
+
+        .overlay-controls h1 {
+            font-size: 3rem;
+            font-weight: bold;
+            text-shadow: 0 0 15px rgba(0, 255, 255, 0.8);
+            margin: 0;
+        }
+
+        .instructions {
+            margin-top: 20px;
+            font-size: 1.5rem;
+            color: rgba(255, 255, 255, 0.7);
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.6);
+        }
+
+        /* 3D Parallax Effect */
+        .parallax {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: -1;
+            pointer-events: none;
+            transition: transform 0.1s ease-in-out;
+        }
+
+        /* Floating button effect */
+        .floating-btn {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 30px;
+            font-size: 1.5rem;
+            background: #00bcd4;
+            color: #fff;
+            border: none;
+            border-radius: 50px;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .floating-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 20px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .floating-btn:active {
+            transform: scale(1.05);
+            box-shadow: 0 15px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Neon effect for interactive elements */
+        .interactive {
+            transition: all 0.3s ease;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.7);
+        }
+
+        .interactive:hover {
+            transform: scale(1.2);
+            filter: brightness(1.2);
+            box-shadow: 0 0 30px rgba(0, 255, 255, 1);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="cursor"></div>
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="overlay"></canvas>
+
+    <!-- Instructional overlay -->
+    <div class="overlay-controls">
+        <h1>Mixed Reality Pinch & Drag</h1>
+        <div class="instructions">Pinch and drag objects in the video feed.</div>
+    </div>
+
+    <!-- Floating button example -->
+    <button class="floating-btn interactive">Try Interaction</button>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="apps.js"></script>
+
+    <script>
+        const cursor = document.querySelector('.cursor');
+
+        // Update cursor position to follow mouse
+        document.addEventListener('mousemove', (e) => {
+            cursor.style.left = `${e.clientX}px`;
+            cursor.style.top = `${e.clientY}px`;
+        });
+
+        // Adjust video and canvas dimensions
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('overlay');
+        const ctx = canvas.getContext('2d');
+
+        let draggingOverlay = null;
+
+        video.addEventListener('loadedmetadata', () => {
+            resizeCanvas();
+        });
+
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+        });
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth * 0.8;
+            canvas.height = window.innerHeight * 0.8;
+        }
+
+        // Overlay objects
+        const overlays = [
+            { img: new Image(), x: 400, y: 100, width: 75, height: 75 },
+            { img: new Image(), x: 300, y: 200, width: 75, height: 75 }
+        ];
+
+        overlays[0].img.src = 'https://picsum.photos/200';
+        overlays[1].img.src = 'https://picsum.photos/id/17/200/300';
+
+        // Draw overlay images on canvas
+        function drawOverlay() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            overlays.forEach(item => {
+                ctx.drawImage(item.img, item.x, item.y, item.width, item.height);
+            });
+        }
+
+        // Initialize MediaPipe Hands for hand detection
+        const hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.7,
+            minTrackingConfidence: 0.7
+        });
+
+        hands.onResults((results) => {
+            drawOverlay();
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+                const thumbTip = landmarks[4];
+                const indexTip = landmarks[8];
+
+                const thumbX = thumbTip.x * canvas.width;
+                const thumbY = thumbTip.y * canvas.height;
+                const indexX = indexTip.x * canvas.width;
+                const indexY = indexTip.y * canvas.height;
+
+                const distance = Math.hypot(thumbX - indexX, thumbY - indexY);
+                const pinchCenter = { x: (thumbX + indexX) / 2, y: (thumbY + indexY) / 2 };
+
+                ctx.beginPath();
+                ctx.arc(pinchCenter.x, pinchCenter.y, 10, 0, 2 * Math.PI);
+                ctx.fillStyle = 'rgba(0, 255, 0, 0.6)';
+                ctx.fill();
+
+                if (distance < 40) {
+                    if (!draggingOverlay) {
+                        for (let item of overlays) {
+                            if (
+                                pinchCenter.x >= item.x &&
+                                pinchCenter.x <= item.x + item.width &&
+                                pinchCenter.y >= item.y &&
+                                pinchCenter.y <= item.y + item.height
+                            ) {
+                                draggingOverlay = item;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (draggingOverlay) {
+                        draggingOverlay.x = pinchCenter.x - draggingOverlay.width / 2;
+                        draggingOverlay.y = pinchCenter.y - draggingOverlay.height / 2;
+                    }
+                } else {
+                    draggingOverlay = null;
+                }
+            }
+        });
+
+        // Set up webcam stream
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+                video.play();
+
+                async function processVideo() {
+                    await hands.send({ image: video });
+                    requestAnimationFrame(processVideo);
+                }
+                processVideo();
+            })
+            .catch(err => {
+                console.error("Error accessing the webcam: " + err);
+            });
+    </script>
+</body>
+
+</html>
