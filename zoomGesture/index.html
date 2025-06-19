@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Mixed Reality Zoom-gesture</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes pulseGlow {
+            0% { box-shadow: 0 0 5px #0ff, 0 0 10px #0ff; }
+            50% { box-shadow: 0 0 10px #0ff, 0 0 20px #0ff, 0 0 30px #0ff; }
+            100% { box-shadow: 0 0 5px #0ff, 0 0 10px #0ff; }
+        }
+
+        @keyframes scanLine {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100%); }
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, #0a0a0a, #1a1a1a);
+            font-family: 'Orbitron', sans-serif;
+            color: #0ff; /* Cyan glow */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* Overlay untuk efek noise/glitch */
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                to bottom,
+                rgba(0, 255, 255, 0.05),
+                rgba(0, 255, 255, 0.05) 1px,
+                transparent 1px,
+                transparent 3px
+            );
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        #app-container {
+            position: relative;
+            width: 90vw;
+            height: 90vh;
+            max-width: 1600px;
+            max-height: 900px;
+            border: 3px solid #0ff;
+            box-shadow: 0 0 20px #0ff, inset 0 0 10px #0ff;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.7);
+            overflow: hidden;
+            animation: fadeIn 2s ease-out;
+        }
+
+        #camera-feed-container {
+            position: relative;
+            width: 100%;
+            height: calc(100% - 80px); /* Kurangi tinggi header/footer */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #000;
+            border-bottom: 2px solid #0ff;
+            overflow: hidden; /* Penting untuk video/canvas */
+        }
+
+        video, canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%; /* Make video/canvas fill its container */
+            height: 100%; /* Make video/canvas fill its container */
+            object-fit: cover;
+            transform: scaleX(-1); /* Flips the webcam feed horizontally */
+            filter: brightness(1.2) contrast(1.1); /* Sedikit efek sci-fi */
+        }
+
+        canvas {
+            pointer-events: none; /* Allows clicks to pass through the canvas to elements underneath */
+            z-index: 2; /* Pastikan di atas video */
+        }
+
+        #camera-status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(0, 255, 255, 0.1);
+            border: 1px solid #0ff;
+            padding: 5px 10px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.9em;
+            color: #0ff;
+            border-radius: 3px;
+            z-index: 3;
+            animation: pulseGlow 2s infinite alternate;
+        }
+
+        #camera-status.active {
+            background-color: rgba(0, 255, 0, 0.1);
+            border-color: #0f0;
+            color: #0f0;
+            animation: none; /* Hentikan pulse jika aktif */
+        }
+
+
+        .glitch-effect {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        .glitch-effect::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: 0;
+            width: 100%;
+            height: 5%;
+            background: linear-gradient(to right, transparent, rgba(0, 255, 255, 0.3), transparent);
+            animation: scanLine 3s infinite linear;
+            opacity: 0.7;
+        }
+
+        #ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Agar tidak menghalangi interaksi lain */
+            z-index: 5;
+            box-sizing: border-box;
+        }
+
+        .corner-bracket {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border: 2px solid #0ff;
+        }
+        .corner-bracket.top-left { top: 10px; left: 10px; border-right: none; border-bottom: none; }
+        .corner-bracket.top-right { top: 10px; right: 10px; border-left: none; border-bottom: none; }
+        .corner-bracket.bottom-left { bottom: 10px; left: 10px; border-right: none; border-top: none; }
+        .corner-bracket.bottom-right { bottom: 10px; right: 10px; border-left: none; border-top: none; }
+
+        #title-bar {
+            width: 100%;
+            height: 40px;
+            background-color: rgba(0, 255, 255, 0.05);
+            border-bottom: 1px solid #0ff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2em;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            position: relative;
+            z-index: 6;
+        }
+
+        #status-panel {
+            width: 100%;
+            height: 40px;
+            background-color: rgba(0, 255, 255, 0.05);
+            border-top: 1px solid #0ff;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8em;
+            z-index: 6;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #555;
+            border: 1px solid #0ff;
+        }
+
+        .status-indicator.active {
+            background-color: #0f0; /* Green for active */
+            box-shadow: 0 0 5px #0f0, 0 0 10px #0f0;
+        }
+    </style>
+</head>
+<body>
+    <div id="app-container">
+        <div id="title-bar">
+            Mixed Reality Interface // Zoom Module
+        </div>
+        <div id="camera-feed-container">
+            <video id="webcam" autoplay playsinline></video>
+            <canvas id="overlay"></canvas>
+            <div id="camera-status">Initializing Camera...</div>
+            <div class="glitch-effect"></div> </div>
+        <div id="status-panel">
+            <div class="status-item">
+                <span class="status-indicator" id="hand-detection-status"></span>
+                <span>Hand Detection</span>
+            </div>
+            <div class="status-item">
+                <span class="status-indicator" id="zoom-active-status"></span>
+                <span>Zoom Active</span>
+            </div>
+            <div class="status-item">
+                <span class="status-indicator" id="overlay-status"></span>
+                <span>Overlay Present</span>
+            </div>
+        </div>
+
+        <div id="ui-overlay">
+            <div class="corner-bracket top-left"></div>
+            <div class="corner-bracket top-right"></div>
+            <div class="corner-bracket bottom-left"></div>
+            <div class="corner-bracket bottom-right"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="apps.js"></script>
+    <script>
+        // Update status indicators dynamically
+        const webcam = document.getElementById('webcam');
+        const cameraStatus = document.getElementById('camera-status');
+        const handDetectionStatus = document.getElementById('hand-detection-status');
+        const zoomActiveStatus = document.getElementById('zoom-active-status');
+        const overlayStatus = document.getElementById('overlay-status');
+
+        webcam.addEventListener('playing', () => {
+            cameraStatus.textContent = 'Camera Ready';
+            cameraStatus.classList.add('active');
+        });
+
+        // Contoh bagaimana Anda bisa memperbarui status dari apps.js
+        // Anda perlu memodifikasi apps.js untuk memicu event kustom atau memanggil fungsi ini
+        // Contoh: document.dispatchEvent(new CustomEvent('handDetected', { detail: true }));
+        document.addEventListener('handDetected', (e) => {
+            if (e.detail) {
+                handDetectionStatus.classList.add('active');
+            } else {
+                handDetectionStatus.classList.remove('active');
+            }
+        });
+
+        document.addEventListener('zoomState', (e) => {
+            if (e.detail.active) {
+                zoomActiveStatus.classList.add('active');
+            } else {
+                zoomActiveStatus.classList.remove('active');
+            }
+        });
+
+        // Ini akan selalu aktif karena overlay gambar ada
+        overlayStatus.classList.add('active');
+    </script>
+</body>
+</html>
