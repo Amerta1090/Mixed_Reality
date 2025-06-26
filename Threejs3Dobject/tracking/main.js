@@ -1,10 +1,12 @@
-import * as THREE from 'https://unpkg.com/three@0.165.0/build/three.module.js';
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js';
 
 // --- Three.js Setup ---
 let scene, camera, renderer, model; // 'model' sekarang akan menjadi objek kubus
 
 // Global state for hand data
-const detectedHands = new Map(); // Map untuk menyimpan data tangan: key = hand ID, value = { landmarks, handedness, previousX, previousY }
+// Stores { landmarks, handedness, wristX (current), wristY (current), gesture }
+const detectedHands = new Map();
+let previousHandCount = 0; // To track hand count changes for scaling reset
 
 // UI Elements
 const cameraStatusSpan = document.getElementById('camera-status');
@@ -66,29 +68,64 @@ function onResults(results) {
     canvasCtx.scale(-1, 1);
     canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
-    // Clear previous hand data
-    detectedHands.clear();
+    // Store the hand data from the previous frame before clearing for the current frame
+    // This allows us to access previous positions for delta calculations in apply3DInteraction
+    const prevDetectedHandsData = new Map(detectedHands);
+
+    detectedHands.clear(); // Clear for current frame's new data
     gestureLSpan.textContent = 'None';
     gestureRSpan.textContent = 'None';
 
-    if (results.multiHandLandmarks && results.multiHandedness) {
-        handCountSpan.textContent = results.multiHandedness.length; // Gunakan length dari multiHandedness
+    const currentHandCount = results.multiHandedness ? results.multiHandedness.length : 0;
+    handCountSpan.textContent = currentHandCount;
 
+    // Reset scaling reference if hand count changes from 2 to anything else
+    // Or if it changes from non-2 to 2 (to re-establish initial distance)
+    if (model) {
+        if (currentHandCount !== 2 && previousHandCount === 2) {
+            // Just transitioned from 2 hands to less than 2, reset scaling data
+            model.userData.scalingInitialDistance = undefined;
+            model.userData.scalingInitialScale = undefined;
+        } else if (currentHandCount === 2 && previousHandCount !== 2) {
+            // Just transitioned to 2 hands from less than 2, reset scaling data to force re-initialization
+            // The initialDistance will be set inside apply3DInteraction for the first frame it sees two hands.
+            model.userData.scalingInitialDistance = undefined;
+            model.userData.scalingInitialScale = undefined;
+        }
+    }
+    previousHandCount = currentHandCount; // Update for the next frame
+
+
+    if (results.multiHandLandmarks && results.multiHandedness) {
         results.multiHandedness.forEach((handednessResult, index) => {
             const handedness = handednessResult.label; // "Left" or "Right"
             const landmarks = results.multiHandLandmarks[index];
-
-            // Use a unique key for each hand (e.g., its handedness)
             const handKey = handedness === 'Left' ? 'leftHand' : 'rightHand';
-            const previousHandData = detectedHands.get(handKey) || {}; // Get previous data if exists
 
+            // Get previous frame's wrist position for this hand
+            const prevHandState = prevDetectedHandsData.get(handKey);
+            // Use current wrist position if no previous data (first frame) to avoid NaN
+            const previousWristX = prevHandState ? prevHandState.wristX : landmarks[0].x;
+            const previousWristY = prevHandState ? prevHandState.wristY : landmarks[0].y;
+
+            // Detect gesture for THIS hand (current frame)
+            const currentGesture = detectGesture(landmarks, handedness);
+
+            // Store current frame's data in the map, ready for *next* frame's 'previous'
             detectedHands.set(handKey, {
                 landmarks: landmarks,
                 handedness: handedness,
-                // Store previous wrist position for movement calculation
-                previousX: previousHandData.landmarks ? previousHandData.landmarks[0].x : landmarks[0].x,
-                previousY: previousHandData.landmarks ? previousHandData.landmarks[0].y : landmarks[0].y,
+                wristX: landmarks[0].x, // Store current wrist X
+                wristY: landmarks[0].y, // Store current wrist Y
+                gesture: currentGesture // Store detected gesture
             });
+
+            // Update UI
+            if (handedness === 'Left') {
+                gestureLSpan.textContent = currentGesture;
+            } else if (handedness === 'Right') {
+                gestureRSpan.textContent = currentGesture;
+            }
 
             // Draw hand landmarks
             drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, { color: '#00FF00', lineWidth: 5 });
@@ -96,11 +133,10 @@ function onResults(results) {
 
             // Apply 3D interactions
             if (model) {
-                apply3DInteraction(landmarks, handedness, detectedHands.get(handKey).previousX, detectedHands.get(handKey).previousY);
+                // Pass current landmarks, handedness, and the PREVIOUS wrist positions for delta calculation
+                apply3DInteraction(landmarks, handedness, previousWristX, previousWristY);
             }
         });
-    } else {
-        handCountSpan.textContent = '0';
     }
     canvasCtx.restore();
 }
@@ -148,23 +184,24 @@ async function startCamera() {
             sendToMediaPipe();
         } catch (error) {
             console.error("Error accessing webcam:", error);
+            let errorMessage = `Webcam Error: ${error.message}.`;
             if (error.name === 'NotAllowedError') {
                 cameraStatusSpan.textContent = 'Denied (Permission needed)';
-                alert("Webcam access denied. Please allow camera permissions in your browser settings and refresh.");
+                errorMessage += " Please allow camera permissions in your browser settings and refresh the page.";
             } else if (error.name === 'NotFoundError') {
                 cameraStatusSpan.textContent = 'No webcam found';
-                alert("No webcam found. Please ensure a webcam is connected.");
+                errorMessage += " No webcam found. Please ensure a webcam is connected.";
             } else if (error.name === 'NotReadableError') {
                 cameraStatusSpan.textContent = 'In use/Inaccessible';
-                alert("Webcam is already in use or inaccessible. Close other apps.");
+                errorMessage += " Webcam is already in use or inaccessible. Close other applications that might be using it.";
             } else {
                 cameraStatusSpan.textContent = `Error: ${error.message}`;
-                alert(`An error occurred: ${error.message}`);
             }
+            displayCustomMessage(errorMessage); // Use custom message box
         }
     } else {
         cameraStatusSpan.textContent = 'Not supported';
-        alert("Your browser does not support webcam access.");
+        displayCustomMessage("Your browser does not support webcam access. Please try a different browser (e.g., Chrome, Firefox).");
     }
 }
 
@@ -172,7 +209,37 @@ async function sendToMediaPipe() {
     if (!videoElement.paused && !videoElement.ended) {
         await hands.send({ image: videoElement });
     }
+    // Use requestAnimationFrame for continuous processing of video frames
     requestAnimationFrame(sendToMediaPipe);
+}
+
+// Custom message box function (replaces alert)
+function displayCustomMessage(message) {
+    const messageBox = document.createElement('div');
+    messageBox.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: #333;
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        z-index: 1000;
+        text-align: center;
+        max-width: 80%;
+        font-family: 'Inter', sans-serif;
+    `;
+    messageBox.innerHTML = `
+        <p>${message}</p>
+        <button style="margin-top: 15px; padding: 10px 20px; border: none; border-radius: 5px; background-color: #007bff; color: white; cursor: pointer; font-size: 1rem;">OK</button>
+    `;
+    document.body.appendChild(messageBox);
+
+    messageBox.querySelector('button').onclick = () => {
+        document.body.removeChild(messageBox);
+    };
 }
 
 // --- Gesture Recognition and 3D Interaction Logic ---
@@ -203,25 +270,25 @@ function detectGesture(landmarks, handedness) {
     const pinkyExtended = pinkyTip.y < landmarks[18].y;
 
     // Check if thumb is extended (more robust check needed for complex scenarios)
-    const thumbExtended = getDistance(thumbTip, landmarks[2]) > getDistance(landmarks[3], landmarks[2]) * 0.8; // Adjusted threshold
+    // Compare distance from thumb tip to base with distance from base to second joint.
+    const thumbExtended = getDistance(thumbTip, landmarks[2]) > getDistance(landmarks[3], landmarks[2]) * 0.8;
 
-    // Thumbs Up/Down (relative to wrist and palm orientation)
-    // Check if thumb is generally above the base of the thumb and other fingers are bent
+    // Thumbs Up gesture: thumb extended, other fingers bent, thumb tip above thumb base
     const isThumbsUp = thumbExtended && thumbTip.y < landmarks[3].y &&
                        !indexExtended && !middleExtended && !ringExtended && !pinkyExtended;
 
     // Pinch gesture (thumb and index finger close)
     const pinchDistance = getDistance(thumbTip, indexTip);
-    const isPinching = pinchDistance < 0.05; // Threshold, needs calibration based on your hand size and camera distance
+    const isPinching = pinchDistance < 0.05; // Threshold, needs calibration
 
     // Closed fist (all fingers bent significantly)
-    // Check if tip of finger is below its knuckle
+    // Check if tip of finger is below its knuckle, and thumb is also retracted
     const isClosedFist =
-        indexTip.y > landmarks[6].y &&
+        indexTip.y > landmarks[6].y && // Index finger tip below its knuckle
         middleTip.y > landmarks[10].y &&
         ringTip.y > landmarks[14].y &&
         pinkyTip.y > landmarks[18].y &&
-        getDistance(thumbTip, wrist) < 0.2; // Thumb also retracted
+        getDistance(thumbTip, wrist) < 0.2; // Thumb is relatively close to wrist
 
     // Open palm (all fingers extended)
     const isOpenPalm = indexExtended && middleExtended && ringExtended && pinkyExtended && thumbExtended && !isPinching;
@@ -236,10 +303,6 @@ function detectGesture(landmarks, handedness) {
     if (isThumbsUp) {
         return "Thumbs Up";
     }
-    // Add Thumbs Down if needed
-    // if (thumbDown) {
-    //     return "Thumbs Down";
-    // }
     if (isOpenPalm) {
         return "Open Palm";
     }
@@ -253,25 +316,20 @@ const colorChangeCooldown = 1000; // 1 second cooldown
 function apply3DInteraction(landmarks, handedness, previousX, previousY) {
     if (!model) return;
 
-    const wrist = landmarks[0]; // Wrist landmark
+    const wrist = landmarks[0]; // Current wrist landmark
     const centerX = 0.5; // Center of the screen (normalized)
     const centerY = 0.5;
 
-    const currentGesture = detectGesture(landmarks, handedness);
-
-    if (handedness === 'Left') {
-        gestureLSpan.textContent = currentGesture;
-    } else if (handedness === 'Right') {
-        gestureRSpan.textContent = currentGesture;
-    }
+    // Get the current gesture for this hand from the map (which was just updated in onResults)
+    const currentHandData = detectedHands.get(handedness === 'Left' ? 'leftHand' : 'rightHand');
+    const currentGesture = currentHandData ? currentHandData.gesture : "None";
 
     // --- Translation (Move object with hand position) ---
-    // Apply translation using the dominant hand (e.g., right hand)
-    // Only translate if no hand is in "Fist" gesture (to avoid conflict with rotation)
-    const leftHandGesture = detectedHands.get('leftHand')?.gesture;
-    const rightHandGesture = detectedHands.get('rightHand')?.gesture;
+    // Translation is applied only if NEITHER hand is in a "Fist" gesture.
+    const leftHandIsFist = detectedHands.get('leftHand')?.gesture === "Fist";
+    const rightHandIsFist = detectedHands.get('rightHand')?.gesture === "Fist";
 
-    if (currentGesture !== "Fist" && leftHandGesture !== "Fist" && rightHandGesture !== "Fist") {
+    if (!leftHandIsFist && !rightHandIsFist) {
         const sensitivity = 5; // How much model moves for hand movement
         const targetX = (wrist.x - centerX) * sensitivity;
         const targetY = -(wrist.y - centerY) * sensitivity; // Y-axis inverted for screen vs 3D
@@ -283,12 +341,15 @@ function apply3DInteraction(landmarks, handedness, previousX, previousY) {
 
 
     // --- Rotation (Based on Fist gesture or hand movement) ---
-    // If a hand is in a "Fist" gesture, use its movement for rotation
+    // Apply rotation only if the current hand (the one being processed by this call) is a "Fist"
     if (currentGesture === "Fist") {
         const deltaX = wrist.x - previousX;
         const deltaY = wrist.y - previousY;
-        model.rotation.y -= deltaX * 5; // Rotate around Y-axis with horizontal movement
-        model.rotation.x += deltaY * 5; // Rotate around X-axis with vertical movement
+
+        // Rotate around Y-axis with horizontal movement (positive deltaX moves right, rotates positive Y)
+        model.rotation.y += deltaX * 5;
+        // Rotate around X-axis with vertical movement (positive deltaY moves down, rotates positive X)
+        model.rotation.x += deltaY * 5;
     }
 
 
@@ -301,14 +362,13 @@ function apply3DInteraction(landmarks, handedness, previousX, previousY) {
             const leftIndexTip = leftHandData.landmarks[8];
             const rightIndexTip = rightHandData.landmarks[8];
 
-            // Use distance between index finger tips of both hands
             const distBetweenHands = getDistance(leftIndexTip, rightIndexTip);
 
-            // Establish a base distance dynamically or use a known average
-            // Store the initial distance when two hands are first detected for scaling
-            if (model.userData.scalingInitialDistance === undefined) {
+            // Set initial distance only if it's undefined (first time 2 hands are consistently seen)
+            // This handles cases where hands briefly leave/re-enter
+            if (model.userData.scalingInitialDistance === undefined || model.userData.scalingInitialScale === undefined) {
                 model.userData.scalingInitialDistance = distBetweenHands;
-                model.userData.scalingInitialScale = model.scale.x; // Store current scale
+                model.userData.scalingInitialScale = model.scale.x;
             }
 
             const scaleRatio = distBetweenHands / model.userData.scalingInitialDistance;
@@ -320,19 +380,20 @@ function apply3DInteraction(landmarks, handedness, previousX, previousY) {
             model.scale.setScalar(targetScale);
         }
     } else {
-        // Reset scaling state when only one hand or no hands are detected
+        // If not exactly two hands, ensure scaling reference is cleared
         model.userData.scalingInitialDistance = undefined;
         model.userData.scalingInitialScale = undefined;
     }
 
+
     // --- Color/Material Change (Thumbs Up gesture) ---
+    // This applies to the hand currently being processed by apply3DInteraction
     if (currentGesture === "Thumbs Up") {
         const currentTime = Date.now();
         if (currentTime - lastColorChangeTime > colorChangeCooldown) {
-            // Langsung ubah warna material objek sederhana
             if (model.material) {
                 model.material.color.set(new THREE.Color(Math.random(), Math.random(), Math.random()));
-                model.material.needsUpdate = true; // Penting untuk memperbarui material
+                model.material.needsUpdate = true; // Important to update material
             }
             lastColorChangeTime = currentTime;
         }
@@ -351,6 +412,9 @@ function animate() {
 }
 
 // --- Initialization ---
-initThreeJS();
-startCamera();
-animate();
+// Ensure the DOM is fully loaded before initializing
+window.onload = function() {
+    initThreeJS();
+    startCamera();
+    animate();
+};
