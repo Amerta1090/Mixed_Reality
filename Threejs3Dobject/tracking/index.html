@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hand Gesture 3D Interaction (Simple Object)</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Advanced Hand Gesture 3D Interaction</h1>
+
+        <div class="main-content">
+            <div class="video-panel">
+                <video class="input_video"></video>
+                <canvas class="output_canvas"></canvas>
+            </div>
+
+            <div class="info-panel">
+                <div id="threejs-container"></div>
+            </div>
+        </div>
+
+        <div class="controls-panel">
+            <div class="status-box">
+                <h2>Status</h2>
+                <p>Camera: <span id="camera-status">Initializing...</span></p>
+                <p>Hands: <span id="hand-count">0</span></p>
+                <p>Gesture L: <span id="gesture-l">None</span></p>
+                <p>Gesture R: <span id="gesture-r">None</span></p>
+            </div>
+            <div class="instructions-box">
+                <h2>Instructions</h2>
+                <ul>
+                    <li>Gerakkan tangan (kanan) secara horizontal/vertikal untuk **menggeser** objek.</li>
+                    <li>Kepalkan tangan (kiri/kanan) untuk **memutar** objek.</li>
+                    <li>Dua tangan mencubit (jari telunjuk/jempol) untuk **memperbesar/memperkecil** objek.</li>
+                    <li>Gestur "Jempol Ke Atas" untuk mengubah warna objek.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'https://unpkg.com/three@0.165.0/build/three.module.js';
+        window.THREE = THREE;
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>

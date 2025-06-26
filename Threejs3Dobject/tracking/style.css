@@ -1,0 +1,197 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: linear-gradient(to right, #4facfe 0%, #00f2fe 100%);
+    margin: 0;
+    flex-direction: column;
+    color: #333;
+    overflow: hidden; /* Prevent scrollbars */
+}
+
+.container {
+    background-color: rgba(255, 255, 255, 0.95);
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    width: 90%;
+    max-width: 1200px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+h1 {
+    color: #007bff;
+    margin-bottom: 20px;
+    font-size: 2.2em;
+}
+
+.main-content {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap; /* Allows wrapping on smaller screens */
+}
+
+.video-panel, .info-panel {
+    background-color: #222;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.5);
+    flex: 1; /* Allow panels to grow */
+    min-width: 320px; /* Minimum width for each panel */
+    height: 480px; /* Fixed height for consistency */
+}
+
+.video-panel {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.input_video, .output_canvas {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Ensures video covers the area */
+}
+
+.output_canvas {
+    transform: scaleX(-1); /* Mirror the canvas horizontally */
+    z-index: 2; /* Make sure canvas is above video */
+}
+
+.input_video {
+    z-index: 1;
+}
+
+#threejs-container {
+    width: 100%;
+    height: 100%;
+    position: relative; /* To allow absolute positioning of canvas */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#threejs-container canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* Hapus bagian ini karena loading-overlay sudah tidak ada */
+/*
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 1.2em;
+    z-index: 20;
+    border-radius: 10px;
+}
+
+.spinner {
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-top: 4px solid #00f2fe;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 10px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+*/
+
+.controls-panel {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
+
+.status-box, .instructions-box {
+    background-color: #e9f5ff;
+    padding: 20px;
+    border-radius: 10px;
+    text-align: left;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    flex: 1;
+    min-width: 280px;
+}
+
+.status-box h2, .instructions-box h2 {
+    color: #007bff;
+    margin-top: 0;
+    border-bottom: 2px solid #b3d9ff;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+.status-box p {
+    margin: 8px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1.1em;
+}
+
+.status-box span {
+    font-weight: bold;
+    color: #0056b3;
+}
+
+.instructions-box ul {
+    list-style: none;
+    padding: 0;
+}
+
+.instructions-box li {
+    margin-bottom: 8px;
+    padding-left: 25px;
+    position: relative;
+}
+
+.instructions-box li::before {
+    content: '•';
+    color: #007bff;
+    font-weight: bold;
+    display: inline-block;
+    width: 1em;
+    margin-left: -1em;
+    position: absolute;
+    left: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .main-content, .controls-panel {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .video-panel, .info-panel, .status-box, .instructions-box {
+        width: 100%;
+        max-width: 480px; /* Constrain width on smaller screens */
+    }
+}
