@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Efek Api di Ujung Jari - MediaPipe</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        /* General Body Styles */
+        body {
+            font-family: 'Share Tech Mono', monospace; /* Techy, monospaced font */
+            background-color: #0d0a1b; /* Deep, dark purple-blue */
+            color: #e0f2f7; /* Light cyan for text */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1rem;
+            overflow: hidden; /* Prevent scrollbar from background effects */
+        }
+
+        /* Pseudo 3D Grid Background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(to right, #1a0f3d 1px, transparent 1px),
+                linear-gradient(to bottom, #1a0f3d 1px, transparent 1px);
+            background-size: 50px 50px;
+            opacity: 0.3; /* Subtle grid */
+            z-index: -1;
+            animation: panBackground 60s linear infinite;
+        }
+
+        @keyframes panBackground {
+            from {
+                background-position: 0 0;
+            }
+            to {
+                background-position: -5000px -5000px;
+            }
+        }
+
+        /* Title and Paragraph Styles */
+        h1 {
+            font-family: 'Orbitron', sans-serif; /* Futuristic, bold font */
+            text-shadow: 0 0 10px #ff00ff, 0 0 20px #ff00ff, 0 0 30px #ff00ff; /* Magenta neon glow */
+            letter-spacing: 2px;
+        }
+
+        p {
+            color: #a0aec0; /* Slightly muted for context */
+        }
+
+        /* Button Styles - Sci-fi / Cyberpunk feel */
+        #webcamButton {
+            position: relative;
+            background: linear-gradient(45deg, #00ffff, #ff00ff); /* Cyan to Magenta gradient */
+            border: none;
+            padding: 1.2rem 3rem;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-radius: 5px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.6), 0 0 25px rgba(255, 0, 255, 0.6);
+        }
+
+        #webcamButton:hover {
+            transform: scale(1.1) rotate(2deg); /* More aggressive hover */
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.8), 0 0 40px rgba(255, 0, 255, 0.8);
+        }
+
+        #webcamButton::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.2);
+            transform: skewX(-30deg);
+            transition: all 0.7s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+
+        #webcamButton:hover::before {
+            left: 100%;
+        }
+
+        /* Video and Canvas Container */
+        #liveView {
+            border: 2px solid #00ffff; /* Cyan border */
+            box-shadow: 0 0 20px #00ffff, 0 0 40px rgba(0, 255, 255, 0.5); /* Cyan glow */
+            transform: perspective(1000px) rotateX(5deg) rotateY(-5deg); /* Subtle 3D tilt */
+            transition: transform 0.5s ease-in-out;
+            background-color: #0a0714; /* Darker background for the view */
+        }
+
+        #liveView.active { /* Add this class with JS when camera is on */
+            transform: perspective(1000px) rotateX(0deg) rotateY(0deg); /* Flatten when active */
+            box-shadow: 0 0 30px #ff00ff, 0 0 60px rgba(255, 0, 255, 0.6); /* Shift to magenta glow when active */
+            border-color: #ff00ff;
+        }
+
+        /* Webcam and Canvas Positioning */
+        .video-hidden {
+            display: none;
+        }
+        .absolute-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+        #loadingMessage {
+            font-family: 'Share Tech Mono', monospace;
+            color: #a0aec0;
+            text-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-5xl mx-auto text-center z-10">
+        <h1 class="text-4xl md:text-6xl font-bold mb-4">DETEKSI ENERGI 🔥</h1>
+        <p class="text-xl text-gray-400 mb-10">Aktifkan kamera dan rasakan kekuatan elemen di ujung jari Anda.</p>
+
+        <button id="webcamButton" class="text-white font-bold py-3 px-6 rounded-lg shadow-lg mb-12">
+            Aktifkan Generator Plasma
+        </button>
+
+        <div id="liveView" class="relative w-full aspect-video rounded-xl overflow-hidden shadow-2xl flex items-center justify-center">
+            <p id="loadingMessage" class="text-lg animate-pulse">Memulai matriks... menunggu izin input visual.</p>
+            <video id="webcam" class="video-hidden" autoplay playsinline></video>
+            <canvas class="absolute-canvas w-full h-full" id="output_canvas"></canvas>
+        </div>
+    </div>
+
+    <img id="fireImage" src="api.png" alt="Gambar Api" class="hidden" crossOrigin="anonymous">
+
+    <script type="module" src="main.js"></script>
+
+    <script>
+        // JavaScript to toggle the 'active' class on #liveView
+        const webcamButton = document.getElementById("webcamButton");
+        const liveView = document.getElementById("liveView");
+
+        webcamButton.addEventListener("click", () => {
+            // This assumes your enableCam function in main.js will set/unset webcamRunning
+            // You might need to adjust based on how enableCam updates webcamRunning
+            if (webcamButton.innerText.includes("Hentikan")) { // Assuming your JS changes button text
+                liveView.classList.add("active");
+            } else {
+                liveView.classList.remove("active");
+            }
+        });
+    </script>
+</body>
+</html>
